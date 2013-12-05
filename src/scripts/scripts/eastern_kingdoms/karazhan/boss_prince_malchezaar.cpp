@@ -348,6 +348,38 @@ CreatureAI* GetAI_npc_infernal_target(Creature* pCreature)
     return new npc_infernal_targetAI(pCreature);
 }
 
+struct BLIZZLIKE_DLL_DECL netherspite_infernalAI : public Scripted_NoMovementAI
+{
+    netherspite_infernalAI(Creature* pCreature) : Scripted_NoMovementAI(pCreature) { Reset(); }
+
+    uint32 HellfireTimer;
+
+    void Reset() override
+    {
+        HellfireTimer = 1000;
+    }
+    void MoveInLineOfSight(Unit* /*pWho*/) override { }
+    void AttackStart(Unit* /*pWho*/) override { }
+    void UpdateAI(const uint32 uiDiff) override
+    {
+        if(HellfireTimer)
+        {
+            if(HellfireTimer <= uiDiff)
+            {
+                m_creature->CastSpell(m_creature, SPELL_HELLFIRE, false);
+                HellfireTimer = 100;
+            }
+            else
+               HellfireTimer -= uiDiff;
+        }
+    }
+};
+
+CreatureAI* GetAI_netherspite_infernal(Creature* pCreature)
+{
+    return new netherspite_infernalAI(pCreature);
+}
+
 void AddSC_boss_prince_malchezaar()
 {
     Script* pNewScript;
@@ -360,5 +392,10 @@ void AddSC_boss_prince_malchezaar()
     pNewScript = new Script;
     pNewScript->Name = "npc_infernal_target";
     pNewScript->GetAI = &GetAI_npc_infernal_target;
+    pNewScript->RegisterSelf();
+
+    pNewScript = new Script;
+    pNewScript->Name = "netherspite_infernal";
+    pNewScript->GetAI = &GetAI_netherspite_infernal;
     pNewScript->RegisterSelf();
 }

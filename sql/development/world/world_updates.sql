@@ -91,3 +91,6 @@ INSERT INTO `creature_movement` (`id`,`point`,`position_x`,`position_y`,`positio
 (@PATH, 42, 8846.429, -5720.661, 0.49396, 0),
 (@PATH, 43, 8873.341, -5735.012, 0.43308, 0),
 (@PATH, 44, 8880.688, -5754.608, 0.25531, 60000);
+
+-- Netherspite Infernal
+UPDATE `creature_template` SET `faction_A` = '114', `faction_H` = '114', `ScriptName` = 'netherspite_infernal' WHERE `entry` = '17646';
