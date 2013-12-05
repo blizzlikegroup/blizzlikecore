@@ -1,0 +1,178 @@
+From 0b3c6168f9f56789c9d9ddb6faab7e0759a948e0 Mon Sep 17 00:00:00 2001
+From: ysfl <ysfllxcn@live.com>
+Date: Mon, 14 Oct 2013 00:23:49 +0800
+Subject: Mount on loan
+
+diff --git a/sql/development/world/world_rentalmount.sql b/sql/development/world/world_rentalmount.sql
+new file mode 100644
+index 0000000..b7d3b46
+--- /dev/null
++++ b/sql/development/world/world_rentalmount.sql
+@@ -0,0 +1,4 @@
++-- Command: .npc add 91015
++DELETE FROM `creature_template` WHERE `entry` = 91015;
++INSERT INTO `creature_template` (`entry`, `heroic_entry`, `modelid_1`, `modelid_2`, `modelid_3`, `modelid_4`, `name`, `subname`, `IconName`, `gossip_menu_id`, `minlevel`, `maxlevel`, `minhealth`, `maxhealth`, `minmana`, `maxmana`, `armor`, `faction_A`, `faction_H`, `npcflag`, `speed_run`, `scale`, `rank`, `mindmg`, `maxdmg`, `dmgschool`, `attackpower`, `baseattacktime`, `rangeattacktime`, `unit_flags`, `dynamicflags`, `family`, `trainer_type`, `trainer_spell`, `trainer_class`, `trainer_race`, `minrangedmg`, `maxrangedmg`, `rangedattackpower`, `type`, `type_flags`, `lootid`, `pickpocketloot`, `skinloot`, `resistance1`, `resistance2`, `resistance3`, `resistance4`, `resistance5`, `resistance6`, `PetSpellDataId`, `mingold`, `maxgold`, `AIName`, `MovementType`, `InhabitType`, `RacialLeader`, `RegenHealth`, `equipment_id`, `mechanic_immune_mask`, `flags_extra`, `ScriptName`) VALUES
++(91015, 0, 10216, 0, 10216, 0, 'Lucas', 'Mount on loan', NULL, 0, 70, 70, 5000, 5000, 0, 0, 2865, 35, 35, 1, 1, 1, 1, 60, 165, 0, 97, 1500, 1500, 0, 0, 0, 0, 0, 0, 0, 50, 100, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', 0, 1, 1, 1, 0, 0, 0, 'npc_rentalmount');
+diff --git a/src/scripts/scripts/custom/npc_rentalmount.cpp b/src/scripts/scripts/custom/npc_rentalmount.cpp
+new file mode 100644
+index 0000000..da731c3
+--- /dev/null
++++ b/src/scripts/scripts/custom/npc_rentalmount.cpp
+@@ -0,0 +1,136 @@
++#include "precompiled.h"
++#include "Config/Config.h"
++
++#define MSG_GOSSIP_TEXT_1  "I would like to rent a Ancient Frostsaber" 
++#define MSG_GOSSIP_TEXT_2  "I would like to rent a Swift Brewfest Ram" 
++#define MSG_GOSSIP_TEXT_3  "I would like to rent a Black War Kodo"
++#define MSG_GOSSIP_TEXT_4  "I would like to rent a Swift Blue Raptor"
++#define MSG_GOSSIP_TEXT_5  "I would like to rent a Black War Tiger"
++#define MSG_GOSSIP_TEXT_6  "I would like to rent a Amani War Bear"
++#define MSG_GOSSIP_TEXT_7  "I would like to rent a Mechanostrider"
++#define MSG_GOSSIP_TEXT_8  "I would like to rent a Raven Lord"
++#define MSG_NOT_MONEY      "You do not have enough money." 
++#define MSG_MOUTED         "You already have a mount." 
++#define MOUNT_SPELL_ID_1   16056 
++#define MOUNT_SPELL_ID_2   43900 
++#define MOUNT_SPELL_ID_3   22718 
++#define MOUNT_SPELL_ID_4   23241 
++#define MOUNT_SPELL_ID_5   22723 
++#define MOUNT_SPELL_ID_6   43688 
++#define MOUNT_SPELL_ID_7   17453 
++#define MOUNT_SPELL_ID_8   41252 
++#define NEW_GOSSIP_MESSAGE 40000
++bool GossipHello_npc_rentalmount(Player *player, Creature *_creature) 
++{ 
++    player->ADD_GOSSIP_ITEM(4, MSG_GOSSIP_TEXT_1, GOSSIP_SENDER_MAIN, 1001); 
++    player->ADD_GOSSIP_ITEM(4, MSG_GOSSIP_TEXT_2, GOSSIP_SENDER_MAIN, 1002); 
++    player->ADD_GOSSIP_ITEM(4, MSG_GOSSIP_TEXT_3, GOSSIP_SENDER_MAIN, 1003); 
++    player->ADD_GOSSIP_ITEM(4, MSG_GOSSIP_TEXT_4, GOSSIP_SENDER_MAIN, 1004); 
++    player->ADD_GOSSIP_ITEM(4, MSG_GOSSIP_TEXT_5, GOSSIP_SENDER_MAIN, 1005); 
++    player->ADD_GOSSIP_ITEM(4, MSG_GOSSIP_TEXT_6, GOSSIP_SENDER_MAIN, 1006); 
++    player->ADD_GOSSIP_ITEM(4, MSG_GOSSIP_TEXT_7, GOSSIP_SENDER_MAIN, 1007); 
++    player->ADD_GOSSIP_ITEM(4, MSG_GOSSIP_TEXT_8, GOSSIP_SENDER_MAIN, 1008); 
++    player->SEND_GOSSIP_MENU(NEW_GOSSIP_MESSAGE, _creature->GetObjectGuid()); 
++    return true; 
++} 
++
++bool GossipSelect_npc_rentalmount(Player *player, Creature *_creature, uint32 sender, uint32 action ) 
++{ 
++    if (sender != GOSSIP_SENDER_MAIN) 
++        return false; 
++
++    if (player->IsMounted()){ 
++        _creature->MonsterSay(MSG_MOUTED, NULL); 
++         return false; 
++    } 
++
++    uint32 fastprice = sConfig.GetIntDefault("RentalMountNPC.FastPrice",500);
++
++    switch (action) 
++    { 
++    case 1001: 
++        if (player->GetMoney() < fastprice) 
++        { 
++            _creature->MonsterSay(MSG_NOT_MONEY, NULL); 
++        } else { 
++            player->CastSpell(player,MOUNT_SPELL_ID_1,false);
++            player->ModifyMoney(-1 * fastprice); 
++        } 
++        break; 
++    case 1002: 
++        if (player->GetMoney() < fastprice) 
++        { 
++            _creature->MonsterSay(MSG_NOT_MONEY, NULL); 
++        } else { 
++            player->CastSpell(player,MOUNT_SPELL_ID_2,false); 
++            player->ModifyMoney(-1 * fastprice); 
++        } 
++        break; 
++    case 1003: 
++        if (player->GetMoney() < fastprice) 
++        { 
++            _creature->MonsterSay(MSG_NOT_MONEY, NULL); 
++        } else { 
++            player->CastSpell(player,MOUNT_SPELL_ID_3,false); 
++            player->ModifyMoney(-1 * fastprice); 
++        } 
++        break; 
++    case 1004: 
++        if (player->GetMoney() < fastprice) 
++        { 
++            _creature->MonsterSay(MSG_NOT_MONEY, NULL); 
++        } else { 
++            player->CastSpell(player,MOUNT_SPELL_ID_4,false); 
++            player->ModifyMoney(-1 * fastprice); 
++        } 
++        break; 
++   case 1005: 
++        if (player->GetMoney() < fastprice) 
++        { 
++            _creature->MonsterSay(MSG_NOT_MONEY, NULL); 
++        } else { 
++            player->CastSpell(player,MOUNT_SPELL_ID_5,false); 
++            player->ModifyMoney(-1 * fastprice); 
++        } 
++        break; 
++    case 1006: 
++        if (player->GetMoney() < fastprice) 
++        { 
++            _creature->MonsterSay(MSG_NOT_MONEY, NULL); 
++        } else { 
++            player->CastSpell(player,MOUNT_SPELL_ID_6,false); 
++            player->ModifyMoney(-1 * fastprice); 
++        } 
++        break; 
++    case 1007: 
++        if (player->GetMoney() < fastprice) 
++        { 
++            _creature->MonsterSay(MSG_NOT_MONEY, NULL); 
++        } else { 
++            player->CastSpell(player,MOUNT_SPELL_ID_7,false); 
++            player->ModifyMoney(-1 * fastprice); 
++        } 
++        break; 
++    case 1008: 
++        if (player->GetMoney() < fastprice) 
++        { 
++            _creature->MonsterSay(MSG_NOT_MONEY, NULL); 
++        } else { 
++            player->CastSpell(player,MOUNT_SPELL_ID_8,false); 
++            player->ModifyMoney(-1 * fastprice); 
++        } 
++        break; 
++
++    } 
++    player->CLOSE_GOSSIP_MENU();
++    return true; 
++} 
++void AddSC_npc_rentalmount()
++{ 
++     Script *newscript; 
++     newscript = new Script; 
++     newscript->Name = "npc_rentalmount"; 
++     newscript->pGossipHello = &GossipHello_npc_rentalmount; 
++     newscript->pGossipSelect = &GossipSelect_npc_rentalmount; 
++     newscript->RegisterSelf(); 
++}
+\ No newline at end of file
+diff --git a/src/scripts/system/ScriptLoader.cpp b/src/scripts/system/ScriptLoader.cpp
+index 8ef1280..62209c1 100644
+--- a/src/scripts/system/ScriptLoader.cpp
++++ b/src/scripts/system/ScriptLoader.cpp
+@@ -8,6 +8,7 @@
+ extern void AddSC_battleground();
+ 
+ // custom
++extern void AddSC_npc_rentalmount();
+ 
+ // examples
+ extern void AddSC_example_creature();
+@@ -338,6 +339,7 @@ void AddScripts()
+     AddSC_battleground();
+ 
+     // custom
++    AddSC_npc_rentalmount();
+ 
+     // examples
+     AddSC_example_creature();

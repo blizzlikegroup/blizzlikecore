@@ -1,0 +1,170 @@
+#!/bin/bash
+
+# The directory your binaries are stored at
+BINDIR=~/server/bin/
+# The worldserver binary name
+WORLDNAME=worldserver
+# The realmserver binary name
+REALMNAME=authserver
+# The restarters filename
+RESTARTNAME=blizzlike-restarter
+# The name of the "screens" the restarter creates
+SCRNAME=blizzlike
+# The limit of cpu usage the worldserver have (to prevent deadlocks, infninite loops etc)
+CCPULIMIT=70
+# The limit of cpu usage the realmserver have (to prevent deadlocks, infninite loops etc)
+RCPULIMIT=70
+# Log name of restarter events
+LOGNAME=restarter.log
+
+function checkcpu # Parameters: (name, procpid, cpu usage limit)
+{
+        procname=$1
+        procpid=$2
+        # Check if the process is in /proc/procpid
+        typeset -i limit=$3
+        if [ ! -d "/proc/${procpid}" ]; then
+                return
+        fi
+        # Get usage cpu time
+        typeset -i cputime=`cat /proc/uptime | cut -f1 -d " " | sed 's/\.//'`
+        # Get process usage cpu time
+        typeset -i proctime=`cat /proc/${procpid}/stat | awk '{t = $14 + $15;print t}'`
+        # wait 5 seconds
+        sleep 5
+        # Check if the process is in /proc/procpid
+        typeset -i limit=$3
+        if [ ! -d "/proc/${procpid}" ]; then
+                return
+        fi
+        # get usage cpu time, again
+        typeset -i cputime2=`cat /proc/uptime | cut -f1 -d " " | sed 's/\.//'`
+        # get process usage cpu time, again
+        typeset -i proctime2=`cat /proc/${procpid}/stat | awk '{t = $14 + $15;print t}'`
+        # calculate process usage cpu time over total usage cpu time as percentage
+        typeset -i cpu=$((($proctime2-$proctime)*100/($cputime2-$cputime)))
+        echo "Process $procname, with pid: $procpid, is wasting: $cpu% of cpu"
+        # limit exceed check
+        if [ $cpu -gt $limit ];
+        then
+                # Count the excess
+                let hits+=1
+                if [ $hits = 1 ];
+                then
+                        times="time"
+                else
+                        times="times"
+                fi
+                echo "Process $procname $procpid has exceeded the limit: $limit ($cpu) $hits $times ..." | tee -a "$BINDIR""$LOGNAME"
+                # If hits are greater than 5, kill the process
+                if [ $hits -gt 5 ];
+                then
+                        echo -n "Killing process: $procpid ... " | tee -a "$BINDIR""$LOGNAME"
+                        kill -9 $procpid
+                        killall -9 $procname
+                        # wait until process die
+                        sleep 3
+                        # check if process has died
+                        if [ -z "`pidof $procname`" ];
+                        then
+                                echo "Done." | tee -a "$BINDIR""$LOGNAME"
+                        else
+                                echo "Can't kill the process." | tee -a "$BINDIR""$LOGNAME"
+                        fi
+                                echo "Finished." | tee -a "$BINDIR""$LOGNAME"
+                        fi
+                else
+                # if no limit exceed, reset hit counter
+                let hits=0
+        fi
+}
+
+if [ -n "${1+x}" ];
+then
+        case $1 in
+                start-restarter)
+                        echo "Restarter will start everything now"
+                        screen -AmdS "$SCRNAME"_restarter "$BINDIR""$RESTARTNAME"
+                ;;
+                start-world)
+                        echo "Worldserver will be started now"
+                        screen -AmdS "$SCRNAME"_srv_core "$BINDIR""$WORLDNAME"
+                ;;
+                start-realm)
+                        echo "Realmserver will be started now"
+                        screen -AmdS "$SCRNAME"_srv_core "$BINDIR""$REALMNAME"
+                ;;
+                show-screens)
+                        echo "There shall be 3 screens running with $SCRNAME in the beginning"
+                        screen -ls
+                ;;
+                show-restarter)
+                        for i in {1..5}
+                        do
+                                echo "Press ctrl+a+d to hide the restarter again"
+                        done
+                        sleep 5
+                        screen -r "$SCRNAME"_restarter
+                ;;
+                show-world)
+                        for i in {1..5}
+                        do
+                                echo "Press ctrl+a+d to hide the worldserver again"
+                        done
+                        sleep 5
+                        screen -r "$SCRNAME"_srv_core
+                ;;
+                show-realm)
+                        for i in {1..5}
+                        do
+                                echo "Press ctrl+a+d to hide the realmserver again"
+                        done
+                        sleep 5
+                        screen -r "$SCRNAME"_srv_realm
+                ;;
+                kill-all)
+                        echo "Restarter, Worldserver and Realmserver will hardkilled in 5 seconds (rollbacks are possible)"
+                        echo "if you just read this and got panic press ctrl+c quick"
+                        sleep 5
+                        killall "$RESTARTNAME" "$WORLDNAME" "$REALMNAME"
+                ;;
+                kill-world)
+                        echo "Worldserver will be hardkilled in 5 seconds (rollbacks are possible)"
+                        echo "if you just read this and got panic press ctrl+c quick"
+                        sleep 5
+                        killall "$WORLDNAME"
+                ;;
+                kill-realm)
+                        echo "Realmserver killed"
+                        killall "$REALMNAME"
+                ;;
+        *)
+        echo "Usage: start-restarter | start-world | start-realm | show-screens |show-restarter | show-world | show-realm | kill-all | kill-world | kill-realm | help"
+        esac
+else
+        while true
+        do
+                PID1=$(pidof $WORLDNAME)
+                if (( PID1 < 1 ))
+                then
+                        NOW=$(date +"%d-%m-%Y-%T")
+                        sleep 2
+                        cd "$BINDIR"
+                        screen -AmdS "$SCRNAME"_srv_core "$BINDIR""$WORLDNAME"
+                        echo "$NOW world daemon restarted" | tee -a "$BINDIR""$LOGNAME"
+                else
+                        checkcpu "$WORLDNAME" "$PID1" "$CCPULIMIT"
+                fi
+                PID2=$(pidof $REALMNAME)
+                if (( PID2 < 1 ))
+                then
+                        NOW=$(date +"%d-%m-%Y-%T")
+                        sleep 2
+                        cd "$BINDIR"
+                        screen -AmdS "$SCRNAME"_srv_realm "$BINDIR""$REALMNAME"
+                        echo "$NOW realm daemon restarted" | tee -a "$BINDIR""$LOGNAME"
+                else
+                        checkcpu "$REALMNAME" "$PID2" "$RCPULIMIT"
+                fi
+        done
+fi

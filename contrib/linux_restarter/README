@@ -1,0 +1,6 @@
+Usage: Simply drop it into your server/ directory and run.
+(run in screens (see gnu screen)
+===========================================
+sudo apt-get install screen
+sudo cp blizzlike-restarter /home/<username>/server/
+sudo chmod +x /home/<username>/server/blizzlike-restarter

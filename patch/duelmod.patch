@@ -1,0 +1,99 @@
+From 33c6eb421c80c5735645a0b930953ddedec11941 Mon Sep 17 00:00:00 2001
+From: Vstar <vstar0v0@hotmail.com>
+Date: Wed, 30 Oct 2013 00:21:56 +0800
+Subject: [PATCH] Core: Add dueling tastes features
+
+When not in use can be closed, and optionally the extended:)
+---
+ src/game/DuelHandler.cpp                 | 19 +++++++++++++++++++
+ src/game/World.cpp                       |  2 ++
+ src/game/World.h                         |  1 +
+ src/worldserver/worldserver.conf.dist.in | 11 ++++++++++-
+ 4 files changed, 32 insertions(+), 1 deletion(-)
+
+diff --git a/src/game/DuelHandler.cpp b/src/game/DuelHandler.cpp
+index 705636a..a4349d8 100644
+--- a/src/game/DuelHandler.cpp
++++ b/src/game/DuelHandler.cpp
+@@ -23,6 +23,7 @@
+ #include "Opcodes.h"
+ #include "UpdateData.h"
+ #include "Player.h"
++#include "World.h"
+ 
+ void WorldSession::HandleDuelAcceptedOpcode(WorldPacket& recvPacket)
+ {
+@@ -48,6 +49,24 @@ void WorldSession::HandleDuelAcceptedOpcode(WorldPacket& recvPacket)
+ 
+     pl->SendDuelCountdown(3000);
+     plTarget->SendDuelCountdown(3000);
++
++    if (sWorld.getConfig(CONFIG_BOOL_DUELMOD))
++    {
++        //Remove cooldowns
++        pl->RemoveArenaSpellCooldowns();
++        plTarget->RemoveArenaSpellCooldowns();
++        //Restart all power
++        pl->SetHealth(pl->GetMaxHealth());
++        plTarget->SetHealth(plTarget->GetMaxHealth());
++        pl->RegenerateAll();
++        plTarget->RegenerateAll();
++        //Remove diminishing returns
++        pl->ClearDiminishings();
++        plTarget->ClearDiminishings();
++        //Begin info
++        pl->GetSession()->SendNotification("Good luck !");
++        plTarget->GetSession()->SendNotification("Good luck !");
++    }
+ }
+ 
+ void WorldSession::HandleDuelCancelledOpcode(WorldPacket& recvPacket)
+diff --git a/src/game/World.cpp b/src/game/World.cpp
+index f3485bf..6cd4e4d 100644
+--- a/src/game/World.cpp
++++ b/src/game/World.cpp
+@@ -583,6 +583,8 @@ void World::LoadConfigSettings(bool reload)
+ 
+     setConfig(CONFIG_BOOL_ALL_TAXI_PATHS, "AllFlightPaths", false);
+ 
++    setConfig(CONFIG_BOOL_DUELMOD, "DuelMod", false);
++
+     setConfig(CONFIG_BOOL_INSTANCE_IGNORE_LEVEL, "Instance.IgnoreLevel", false);
+     setConfig(CONFIG_BOOL_INSTANCE_IGNORE_RAID,  "Instance.IgnoreRaid", false);
+ 
+diff --git a/src/game/World.h b/src/game/World.h
+index 3210e78..c921c3c 100644
+--- a/src/game/World.h
++++ b/src/game/World.h
+@@ -327,6 +327,7 @@ enum eConfigBoolValues
+     CONFIG_BOOL_PET_UNSUMMON_AT_MOUNT,
+     CONFIG_BOOL_MMAP_ENABLED,
+     CONFIG_BOOL_PLAYERTOLEADER_ENABLED,
++    CONFIG_BOOL_DUELMOD,
+     CONFIG_BOOL_VALUE_COUNT
+ };
+ 
+diff --git a/src/worldserver/worldserver.conf.dist.in b/src/worldserver/worldserver.conf.dist.in
+index c0c1224..70beea6 100644
+--- a/src/worldserver/worldserver.conf.dist.in
++++ b/src/worldserver/worldserver.conf.dist.in
+@@ -1640,6 +1640,12 @@ CharDelete.KeepDays = 30
+ #        Default: 1 (enable)
+ #                 0 (disable)
+ #
+-###################################################################################################################
++#    DuelMod
++#        Dueling tastes features
++#        Default: 0 (false)
++#                 1 (true)
++#                                              
++###################################################################################################################   
+ 
+-PlayerToLeader.enable = 1
+\ No newline at end of file
++PlayerToLeader.enable = 1
++DuelMod = 0
+\ No newline at end of file
+-- 
+1.8.4
+

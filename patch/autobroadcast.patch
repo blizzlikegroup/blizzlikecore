@@ -1,0 +1,203 @@
+﻿From a72b4d8e45189e93079620b8c716148725dcd0dd Mon Sep 17 00:00:00 2001
+From: Vstar <vstar0v0@hotmail.com>
+Date: Fri, 25 Oct 2013 22:14:35 +0800
+Subject: [PATCH] Core/DB: Add Autobroadcast
+
+---
+ sql/development/world/world_autobroadcast.sql  |  9 +++++
+ src/game/Language.h                            |  3 +-
+ src/game/World.cpp                             | 61 ++++++++++++++++++++++++++++++--
+ src/game/World.h                               |  4 ++-
+ src/worldserver/worldserver.conf.dist.in       | 25 ++++++++++++-
+ 5 files changed, 96 insertions(+), 6 deletions(-)
+ create mode 100644 sql/development/world/world_autobroadcast.sql
+
+diff --git a/sql/development/world/world_autobroadcast.sql b/sql/development/world/world_autobroadcast.sql
+new file mode 100644
+index 0000000..6015360
+--- /dev/null
++++ b/sql/development/world/world_autobroadcast.sql
+@@ -0,0 +1,9 @@
++INSERT INTO `blizzlike_string` (`entry`, `content_default`, `content_loc1`, `content_loc2`, `content_loc3`, `content_loc4`, `content_loc5`, `content_loc6`, `content_loc7`, `content_loc8`) VALUES
++(11000, '|cffffcc00[Broadcaster]: |cff00ff00%s|r', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
++
++CREATE TABLE IF NOT EXISTS `autobroadcast` (
++  `id` int(11) NOT NULL auto_increment,
++  `text` longtext NOT NULL,
++  `next` int(11) NOT NULL,
++  PRIMARY KEY  (`id`)
++) ENGINE=MyISAM  DEFAULT CHARSET=utf8 ;
+\ No newline at end of file
+diff --git a/src/game/Language.h b/src/game/Language.h
+index b751ff2..137be49 100644
+--- a/src/game/Language.h
++++ b/src/game/Language.h
+@@ -1019,7 +1019,8 @@ enum BlizzLikeStrings
+ 
+     // Use for not-in-official-sources patches
+     //                                    10000-10999
+-
++    // Auto Broadcaster
++    LANG_AUTO_BROADCAST                 = 11000,
+     // Use for custom patches             11000-11999
+ 
+     // NOT RESERVED IDS                   12000-1999999999
+diff --git a/src/game/World.cpp b/src/game/World.cpp
+index 09caf89..ad30dd5 100644
+--- a/src/game/World.cpp
++++ b/src/game/World.cpp
+@@ -64,6 +64,7 @@
+ #include "Util.h"
+ #include "AuctionHouseBot/AuctionHouseBot.h"
+ #include "CharacterDatabaseCleaner.h"
++#include "Language.h"
+ #include "CreatureLinkingMgr.h"
+ 
+ INSTANTIATE_SINGLETON_1(World);
+@@ -1299,14 +1300,15 @@ void World::SetInitialWorldSettings()
+ 
+     LoginDatabase.PExecute("INSERT INTO uptime (realmid, starttime, startstring, uptime) VALUES('%u', " UI64FMTD ", '%s', 0)",
+                            realmID, uint64(m_startTime), isoDate);
+-
++    static uint32 abtimer = 0;
++    abtimer = sConfig.GetIntDefault("AutoBroadcast.Timer", 60000);
+     m_timers[WUPDATE_WEATHERS].SetInterval(1 * IN_MILLISECONDS);
+     m_timers[WUPDATE_AUCTIONS].SetInterval(MINUTE * IN_MILLISECONDS);
+     m_timers[WUPDATE_UPTIME].SetInterval(getConfig(CONFIG_UINT32_UPTIME_UPDATE)*MINUTE * IN_MILLISECONDS);
+     // Update "uptime" table based on configuration entry in minutes.
+     m_timers[WUPDATE_CORPSES].SetInterval(20 * MINUTE * IN_MILLISECONDS);
+     m_timers[WUPDATE_DELETECHARS].SetInterval(DAY * IN_MILLISECONDS); // check for chars to delete every day
+-
++    m_timers[WUPDATE_AUTOBROADCAST].SetInterval(abtimer);
+     // for AhBot
+     m_timers[WUPDATE_AHBOT].SetInterval(20 * IN_MILLISECONDS); // every 20 sec
+ 
+@@ -1517,7 +1519,17 @@ void World::Update(uint32 diff)
+         m_timers[WUPDATE_EVENTS].SetInterval(nextGameEvent);
+         m_timers[WUPDATE_EVENTS].Reset();
+     }
+-
++  
++  static uint32 autobroadcaston = 0;
++    autobroadcaston = sConfig.GetIntDefault("AutoBroadcast.On", 0);
++    if(autobroadcaston == 1)
++    {
++        if (m_timers[WUPDATE_AUTOBROADCAST].Passed())
++        {
++            m_timers[WUPDATE_AUTOBROADCAST].Reset();
++            SendBroadcast();
++        }
++    }
+     /// </ul>
+     ///- Move all creatures with "delayed move" and remove and delete all objects with "delayed remove"
+     sMapMgr.RemoveAllObjectsInRemoveList();
+@@ -1922,6 +1934,49 @@ void World::ProcessCliCommands()
+         delete command;
+     }
+ }
++void World::SendBroadcast()
++{
++    std::string msg;
++    static int nextid;
++    QueryResult *result;
++    if(nextid != 0)
++    {
++        result = WorldDatabase.PQuery("SELECT `text`, `next` FROM `autobroadcast` WHERE `id` = %u", nextid);
++    }
++    else
++    {
++        result = WorldDatabase.PQuery("SELECT `text`, `next` FROM `autobroadcast` ORDER BY RAND() LIMIT 1");
++    }
++
++    if(!result)
++        return;
++    nextid = result->Fetch()[1].GetUInt8();
++    msg = result->Fetch()[0].GetString();
++    delete result;
++
++    static uint32 abcenter = 0;
++    abcenter = sConfig.GetIntDefault("AutoBroadcast.Center", 0);
++    if(abcenter == 0)
++    {
++        sWorld.SendWorldText(LANG_AUTO_BROADCAST, msg.c_str());
++        sLog.outString("AutoBroadcast: '%s'",msg.c_str());
++    }
++    if(abcenter == 1)
++    {
++        WorldPacket data(SMSG_NOTIFICATION, (msg.size()+1));
++        data << msg;
++        sWorld.SendGlobalMessage(&data);
++        sLog.outString("AutoBroadcast: '%s'",msg.c_str());
++    }
++    if(abcenter == 2)
++    {
++        sWorld.SendWorldText(LANG_AUTO_BROADCAST, msg.c_str());
++        WorldPacket data(SMSG_NOTIFICATION, (msg.size()+1));
++        data << msg;
++        sWorld.SendGlobalMessage(&data);
++        sLog.outString("AutoBroadcast: '%s'",msg.c_str());
++    }
++}
+ 
+ void World::InitResultQueue()
+ {
+diff --git a/src/game/World.h b/src/game/World.h
+index 3210e78..988d02a 100644
+--- a/src/game/World.h
++++ b/src/game/World.h
+@@ -74,7 +74,8 @@ enum WorldTimers
+     WUPDATE_EVENTS      = 4,
+     WUPDATE_DELETECHARS = 5,
+     WUPDATE_AHBOT       = 6,
+-    WUPDATE_COUNT       = 7
++    WUPDATE_AUTOBROADCAST = 7,
++    WUPDATE_COUNT         = 8
+ };
+ 
+ /// Configuration elements
+@@ -437,6 +438,7 @@ class World
+ 
+         WorldSession* FindSession(uint32 id) const;
+         void AddSession(WorldSession* s);
++        void SendBroadcast();
+         bool RemoveSession(uint32 id);
+         /// Get the number of current active sessions
+         void UpdateMaxSessionCounters();
+diff --git a/src/worldserver/worldserver.conf.dist.in b/src/worldserver/worldserver.conf.dist.in
+index 39fc072..c3d4864 100644
+--- a/src/worldserver/worldserver.conf.dist.in
++++ b/src/worldserver/worldserver.conf.dist.in
+@@ -1642,4 +1642,27 @@ CharDelete.KeepDays = 30
+ #
+ ###################################################################################################################
+ 
+-PlayerToLeader.enable = 1
+\ No newline at end of file
++PlayerToLeader.enable = 1
++
++###################################################################################################################
++# AUTO BROADCAST
++#
++#    AutoBroadcast.On
++#        Enable auto broadcast
++#        Default: 0 - off
++#                 1 - on
++#
++#    AutoBroadcast.Center
++#        Display method
++#        Default: 0 - announce
++#                 1 - notify
++#                 2 - both
++#
++#    AutoBroadcast.Timer
++#        Timer for auto broadcast
++#
++###################################################################################################################
++
++AutoBroadcast.On = 1
++AutoBroadcast.Center = 2
++AutoBroadcast.Timer = 60000
+\ No newline at end of file
+-- 
+1.8.4
+

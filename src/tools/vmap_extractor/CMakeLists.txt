@@ -1,0 +1,57 @@
+# This file is part of the BlizzLikeCore Project. See CREDITS and LICENSE files
+#
+# This file is free software; as a special exception the author gives
+# unlimited permission to copy and/or distribute it, with or without
+# modifications, as long as this notice is preserved.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
+# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+file(GLOB_RECURSE SOURCES *.cpp *.h)
+
+# uncomment next line to disable debug mode
+add_definitions("-DIOMAP_DEBUG")
+
+# build setup currently only supports libmpq 0.4.x
+add_definitions("-DUSE_LIBMPQ04")
+add_definitions("-Wall")
+
+if(NOT WIN32)
+  add_definitions("-ggdb")
+  add_definitions("-O3")
+endif(NOT WIN32)
+
+if(CMAKE_COMPILER_IS_GNUCXX)
+  add_definitions(--no-warnings)
+elseif(MSVC)
+  add_definitions(/W0)
+endif()
+
+include_directories(
+  ${CMAKE_SOURCE_DIR}/dep/libmpq
+)
+
+if(WIN32)
+  include_directories(
+    ${CMAKE_SOURCE_DIR}/dep/libmpq/win
+  )
+endif()
+
+add_executable(vmap_extractor ${SOURCES})
+
+if(WIN32)
+  set(BZIP2_LIBRARIES "bzip2")
+  set(ZLIB_LIBRARIES "zlib")
+elseif(UNIX)
+  set(BZIP2_LIBRARIES "bz2")
+  set(ZLIB_LIBRARIES "z")
+endif()
+
+target_link_libraries(vmap_extractor
+  mpq
+  ${BZIP2_LIBRARIES}
+  ${ZLIB_LIBRARIES}
+)
+
+install(TARGETS vmap_extractor DESTINATION ${BIN_DIR}/tools)

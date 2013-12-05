@@ -1,0 +1,7 @@
+#!/bin/sh
+
+/usr/local/bin/automysqlbackup /etc/automysqlbackup/myserver.conf
+
+chown root.root /blizzlikedbs* -R
+find /blizzlikedbs* -type f -exec chmod 400 {} \;
+find /blizzlikedbs* -type d -exec chmod 700 {} \;

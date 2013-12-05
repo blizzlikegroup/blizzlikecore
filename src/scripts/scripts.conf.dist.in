@@ -1,0 +1,20 @@
+####################################
+# BlizzLikeCore Configuration file #
+####################################
+
+# This file must be placed within the directory which holds worldserver.conf and authserver.conf
+
+[ScriptsConf]
+ConfVersion=2013090801
+
+# Database connection settings for the world server.
+# Default: hostname;port;username;password;database
+#          .;somenumber;username;password;database - use named pipes at Windows
+#                Named pipes: mySQL required adding "enable-named-pipe" to [mysqld] section my.ini
+#          .;/path/to/unix_socket;username;password;database - use Unix sockets at Unix/Linux
+#                Unix sockets: experimental, not tested
+
+ScriptsDatabaseInfo = "127.0.0.1;3306;blizzlike;blizzlike;scripts"
+
+# Log File for Scripts-Errors
+ScriptsErrorLogFile = "ScriptsErrors.log"
