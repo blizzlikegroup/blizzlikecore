@@ -603,14 +603,15 @@ void CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
 
             switch (castResult)
             {
-                case CAST_FAIL_POWER:
-                case CAST_FAIL_TOO_FAR:
+                case CAST_FAIL_TOO_FAR:                         // Victim is too far
+                case CAST_FAIL_POWER:                           // Not enough mana for spell
                 {
                     // Melee current victim if flag not set
                     if (!(action.cast.castFlags & CAST_NO_MELEE_IF_OOM))
                     {
                         switch (m_creature->GetMotionMaster()->GetCurrentMovementGeneratorType())
                         {
+                            case IDLE_MOTION_TYPE:
                             case CHASE_MOTION_TYPE:
                             case FOLLOW_MOTION_TYPE:
                                 m_attackDistance = 0.0f;
@@ -623,6 +624,12 @@ void CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
                                 break;
                         }
                     }
+                    break;
+                }
+                case CAST_FAIL_SWITCH_MELEE:
+                {
+                    if (m_isCombatMovement && action.combat_movement.melee && m_creature->isInCombat() && m_creature->getVictim())
+                        m_creature->SendMeleeAttackStart(m_creature->getVictim());
                     break;
                 }
                 default:

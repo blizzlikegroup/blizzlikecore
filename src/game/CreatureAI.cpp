@@ -23,6 +23,7 @@
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
 #include "CellImpl.h"
+#include "VMapFactory.h"
 
 static_assert(MAXIMAL_AI_EVENT_EVENTAI <= 32, "Maximal 32 AI_EVENTs supported with EventAI");
 
@@ -38,6 +39,9 @@ void CreatureAI::AttackedBy(Unit* attacker)
 
 CanCastResult CreatureAI::CanCastSpell(Unit* pTarget, const SpellEntry* pSpell, bool isTriggered)
 {
+    if (!pTarget)
+        return CAST_FAIL_OTHER;
+
     // If not triggered, we check
     if (!isTriggered)
     {
@@ -45,15 +49,18 @@ CanCastResult CreatureAI::CanCastSpell(Unit* pTarget, const SpellEntry* pSpell, 
         if (m_creature->hasUnitState(UNIT_STAT_CAN_NOT_REACT_OR_LOST_CONTROL))
             return CAST_FAIL_STATE;
 
-        if (pSpell->PreventionType == SPELL_PREVENTION_TYPE_SILENCE && m_creature->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_SILENCED))
+        if (pSpell->PreventionType == SPELL_PREVENTION_TYPE_PACIFY && m_creature->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PACIFIED))
             return CAST_FAIL_STATE;
 
-        if (pSpell->PreventionType == SPELL_PREVENTION_TYPE_PACIFY && m_creature->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PACIFIED))
+        if (pSpell->PreventionType == SPELL_PREVENTION_TYPE_SILENCE && m_creature->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_SILENCED))
             return CAST_FAIL_STATE;
 
         // Check for power (also done by Spell::CheckCast())
         if (m_creature->GetPower((Powers)pSpell->powerType) < Spell::CalculatePowerCost(pSpell, m_creature))
             return CAST_FAIL_POWER;
+
+        if (m_creature->HasSpellCooldown(pSpell->Id))
+            return CAST_FAIL_SPELL_COOLDOWN;
     }
 
     if (const SpellRangeEntry* pSpellRange = sSpellRangeStore.LookupEntry(pSpell->rangeIndex))
@@ -63,13 +70,17 @@ CanCastResult CreatureAI::CanCastSpell(Unit* pTarget, const SpellEntry* pSpell, 
             // pTarget is out of range of this spell (also done by Spell::CheckCast())
             float fDistance = m_creature->GetCombatDistance(pTarget, pSpell->rangeIndex == SPELL_RANGE_IDX_COMBAT);
 
-            if (fDistance > pSpellRange->maxRange)
+            float fMaxRange = pSpellRange->maxRange;
+            if (fDistance > fMaxRange)
                 return CAST_FAIL_TOO_FAR;
 
             float fMinRange = pSpellRange->minRange;
-
-            if (fMinRange && fDistance < fMinRange)
+            if (fDistance < fMinRange)
                 return CAST_FAIL_TOO_CLOSE;
+
+            // TODO: Change conditions if necessary
+            if (fDistance < 2.0f && fMaxRange > 2.0f && !isTriggered)
+                return CAST_FAIL_SWITCH_MELEE;
         }
 
         return CAST_OK;
@@ -80,6 +91,9 @@ CanCastResult CreatureAI::CanCastSpell(Unit* pTarget, const SpellEntry* pSpell, 
 
 CanCastResult CreatureAI::DoCastSpellIfCan(Unit* pTarget, uint32 uiSpell, uint32 uiCastFlags, ObjectGuid uiOriginalCasterGUID)
 {
+    if (!pTarget)
+        return CAST_FAIL_OTHER;
+
     Unit* pCaster = m_creature;
 
     if (uiCastFlags & CAST_FORCE_TARGET_SELF)
@@ -91,11 +105,8 @@ CanCastResult CreatureAI::DoCastSpellIfCan(Unit* pTarget, uint32 uiSpell, uint32
         if (const SpellEntry* pSpell = sSpellStore.LookupEntry(uiSpell))
         {
             // If cast flag CAST_AURA_NOT_PRESENT is active, check if target already has aura on them
-            if (uiCastFlags & CAST_AURA_NOT_PRESENT)
-            {
-                if (pTarget->HasAura(uiSpell))
-                    return CAST_FAIL_TARGET_AURA;
-            }
+            if ((uiCastFlags & CAST_AURA_NOT_PRESENT) && pTarget->HasAura(uiSpell))
+                return CAST_FAIL_TARGET_AURA;
 
             // Check if cannot cast spell
             if (!(uiCastFlags & (CAST_FORCE_TARGET_SELF | CAST_FORCE_CAST)))
@@ -107,7 +118,7 @@ CanCastResult CreatureAI::DoCastSpellIfCan(Unit* pTarget, uint32 uiSpell, uint32
             }
 
             // Interrupt any previous spell
-            if (uiCastFlags & CAST_INTERRUPT_PREVIOUS && pCaster->IsNonMeleeSpellCasted(false))
+            if ((uiCastFlags & CAST_INTERRUPT_PREVIOUS) && pCaster->IsNonMeleeSpellCasted(false))
                 pCaster->InterruptNonMeleeSpells(false);
 
             pCaster->CastSpell(pTarget, pSpell, uiCastFlags & CAST_TRIGGERED, NULL, NULL, uiOriginalCasterGUID);
