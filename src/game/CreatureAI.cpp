@@ -75,12 +75,14 @@ CanCastResult CreatureAI::CanCastSpell(Unit* pTarget, const SpellEntry* pSpell, 
                 return CAST_FAIL_TOO_FAR;
 
             float fMinRange = pSpellRange->minRange;
-            if (fDistance < fMinRange)
+            if (!fMinRange)
+            {
+                if (fDistance < 2.0f
+                    && pSpell->Id == 20792)
+                    return CAST_FAIL_SWITCH_MELEE;
+            }
+            else if (fDistance < fMinRange)
                 return CAST_FAIL_TOO_CLOSE;
-
-            // TODO: Change conditions if necessary
-            if (fDistance < 2.0f && fMaxRange > 2.0f && !isTriggered)
-                return CAST_FAIL_SWITCH_MELEE;
         }
 
         return CAST_OK;
