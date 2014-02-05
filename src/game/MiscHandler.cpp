@@ -74,10 +74,10 @@ void WorldSession::HandleWhoOpcode(WorldPacket& recv_data)
     // recv_data.hexlike();
 
     // prevent who command from being spammed and causing the server to lag
-    time_t now = time(NULL);
+    /*time_t now = time(NULL);
     if (now - timeLastWhoCommand < 5)
         return;
-    else timeLastWhoCommand = now;
+    else timeLastWhoCommand = now;*/
 
     uint32 clientcount = 0;
 
