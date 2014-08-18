@@ -328,3 +328,12 @@ UPDATE `creature_template` SET `lootid` = '16594' WHERE `entry` = '20576';
 UPDATE `creature_template` SET `lootid` = '16593' WHERE `entry` = '20582';
 UPDATE `creature_template` SET `lootid` = '16523' WHERE `entry` = '20591';
 UPDATE `creature_template` SET `lootid` = '16507' WHERE `entry` = '20593';
+
+-- Sethekk Prophet Faction  error modification
+UPDATE `creature_template` SET `faction_A` = '16', `faction_H` = '16' WHERE `entry` = '20695';
+
+-- Avian Ripper Faction  error modification
+UPDATE `creature_template` SET `faction_A` = '14', `faction_H` = '14' WHERE `entry` IN (21891, 21989);
+
+-- Black Temple BOSS Reliquary of the Lost HP correction
+UPDATE `creature_template` SET `minhealth` = '2300000', `maxhealth` = '2300000' WHERE `entry` IN (23418, 23419, 23420);
